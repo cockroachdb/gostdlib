@@ -1,0 +1,16 @@
+diff --git a/src/cmd/gofmt/long_test.go b/src/cmd/gofmt/long_test.go
+index c109653283..be7ba855e1 100644
+--- a/src/cmd/gofmt/long_test.go
++++ b/src/cmd/gofmt/long_test.go
+@@ -73,6 +73,11 @@ func testFile(t *testing.T, b1, b2 *bytes.Buffer, filename string) {
+ 		return
+ 	}
+
++	if strings.HasSuffix(filename, "issue24339.go") {
++		t.Log("known gofmt idempotency bug (Issue #24472)")
++		return
++	}
++
+ 	// make a copy of the result
+ 	b2.Reset()
+ 	b2.Write(b1.Bytes())

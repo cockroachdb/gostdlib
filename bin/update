@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+# Prerequisites:
+#
+#     go get -u github.com/rogpeppe/govers
+#
+
+set -euo pipefail
+
+if [[ $# -ne 0 ]]; then
+  echo "usage: $0" >&2
+  exit 1
+fi
+
+go_version=go1.10.3
+xtools_version=677d2ff680c188ddb7dcd2bfa6bc7d3f2f2f75b2
+
+repos=/tmp/gostdlib/repos
+
+if [[ ! -d "$repos/go" ]]; then
+  git clone https://github.com/golang/go.git "$repos/go"
+fi
+(cd "$repos/go" && git fetch && git checkout --force "$go_version")
+
+if [[ ! -d "$repos/golang.org/x/tools" ]]; then
+  git clone https://github.com/golang/tools.git "$repos/golang.org/x/tools"
+fi
+(cd "$repos/golang.org/x/tools" && git fetch && git checkout --force "$xtools_version")
+
+# Keep sorted in topological order, or govers will bail out.
+packages=(
+  golang.org/x/tools/imports
+  golang.org/x/tools/internal/fastwalk
+  go/format
+  go/printer
+  golang.org/x/tools/cmd/goimports
+  cmd/gofmt
+)
+
+is_stdlib() {
+  [[ $1 != *.* ]]
+}
+
+trim_domain() {
+  if is_stdlib "$1"; then
+    echo "$1"
+  else
+    echo "${1#*/}"
+  fi
+}
+
+find . -type d -maxdepth 1 -not \( -name bin -o -name patches -o -name '.*' \) -exec rm -rf {} +
+
+for p in "${packages[@]}"; do
+  tp=$(trim_domain "$p")
+  mkdir -p "$tp"
+  if is_stdlib "$p"; then
+    cp -R "$repos/go/src/$p/" "$tp"
+  else
+    cp -R "$repos/$p/" "$tp"
+  fi
+done
+
+for p in "${packages[@]}"; do
+  echo ">> rewriting $p"
+  govers -m "$p" "github.com/cockroachdb/gostdlib/$(trim_domain "$p")"
+done
+
+for p in patches/*; do
+  echo ">> applying $p"
+  patch -p2 < "$p"
+done
+find . -name '*.orig' -delete
+
+while read -r f; do
+  echo ">> removing import comment from $f"
+  sed -E 's,// import .*,,' "$f" > "$f.tmp"
+  mv "$f.tmp" "$f"
+done < <(grep -lER 'package \S+ // import' -- * | grep '\.go$')
+
+go build -o bin/gofmt ./cmd/gofmt
+bin/gofmt -w .
