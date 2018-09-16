@@ -73,11 +73,6 @@ func testFile(t *testing.T, b1, b2 *bytes.Buffer, filename string) {
 		return
 	}
 
-	if strings.HasSuffix(filename, "issue24339.go") {
-		t.Log("known gofmt idempotency bug (Issue #24472)")
-		return
-	}
-
 	// make a copy of the result
 	b2.Reset()
 	b2.Write(b1.Bytes())

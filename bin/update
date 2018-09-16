@@ -12,7 +12,7 @@ if [[ $# -ne 0 ]]; then
   exit 1
 fi
 
-go_version=go1.10.3
+go_version=go1.11
 xtools_version=677d2ff680c188ddb7dcd2bfa6bc7d3f2f2f75b2
 
 repos=/tmp/gostdlib/repos
