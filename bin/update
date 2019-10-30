@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-# Prerequisites:
-#
-#     go get -u github.com/rogpeppe/govers
-#
-
 set -euo pipefail
 
 if [[ $# -ne 0 ]]; then
@@ -12,8 +7,8 @@ if [[ $# -ne 0 ]]; then
   exit 1
 fi
 
-go_version=go1.11
-xtools_version=677d2ff680c188ddb7dcd2bfa6bc7d3f2f2f75b2
+go_version=go1.13
+xtools_version=86caa796c7ab0e32b908c5ebd5748faedd06c1da
 
 repos=/tmp/gostdlib/repos
 
@@ -27,14 +22,25 @@ if [[ ! -d "$repos/golang.org/x/tools" ]]; then
 fi
 (cd "$repos/golang.org/x/tools" && git fetch && git checkout --force "$xtools_version")
 
-# Keep sorted in topological order, or govers will bail out.
 packages=(
-  golang.org/x/tools/imports
-  golang.org/x/tools/internal/fastwalk
+  cmd/gofmt
   go/format
   go/printer
   golang.org/x/tools/cmd/goimports
-  cmd/gofmt
+  golang.org/x/tools/go/ast/astutil
+  golang.org/x/tools/go/internal/packagesdriver
+  golang.org/x/tools/go/packages
+  golang.org/x/tools/go/types/typeutil
+  golang.org/x/tools/imports
+  golang.org/x/tools/internal/fastwalk
+  golang.org/x/tools/internal/gopathwalk
+  golang.org/x/tools/internal/imports
+  golang.org/x/tools/internal/module
+  golang.org/x/tools/internal/semver
+  golang.org/x/tools/internal/span
+  golang.org/x/tools/internal/testenv
+  golang.org/x/tools/internal/tool
+  golang.org/x/tools/internal/txtar
 )
 
 is_stdlib() {
@@ -63,8 +69,9 @@ done
 
 for p in "${packages[@]}"; do
   echo ">> rewriting $p"
-  govers -m "$p" "github.com/cockroachdb/gostdlib/$(trim_domain "$p")"
+  find . -name '*.go' | xargs sed -i.bak -e "s,$p,github.com/cockroachdb/gostdlib/$(trim_domain $p),"
 done
+find . -name '*.bak' -delete
 
 for p in patches/*; do
   echo ">> applying $p"
