@@ -7,7 +7,7 @@ if [[ $# -ne 0 ]]; then
   exit 1
 fi
 
-go_version=go1.13
+go_version=go1.14
 xtools_version=86caa796c7ab0e32b908c5ebd5748faedd06c1da
 
 repos=/tmp/gostdlib/repos
@@ -24,6 +24,7 @@ fi
 
 packages=(
   cmd/gofmt
+  cmd/internal/diff
   go/format
   go/printer
   golang.org/x/tools/cmd/goimports
