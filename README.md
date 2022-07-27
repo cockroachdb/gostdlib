@@ -6,6 +6,7 @@ versioned separately from a Go installation. The list currently includes:
   * cmd/gofmt
   * go/format
   * go/printer
+  * golang.org/x/sync†
   * golang.org/x/tools/cmd/goimports†
   * golang.org/x/tools/imports†
 

@@ -1654,6 +1654,34 @@ import f "fmt"
 `,
 		unchanged: true,
 	},
+	// this test panics without PositionFor in DeleteNamedImport
+	{
+		name:       "import.44",
+		pkg:        "foo.com/other/v3",
+		renamedPkg: "",
+		in: `package main
+//line mah.go:600
+
+import (
+"foo.com/a.thing"
+"foo.com/surprise"
+"foo.com/v1"
+"foo.com/other/v2"
+"foo.com/other/v3"
+)
+`,
+		out: `package main
+
+//line mah.go:600
+
+import (
+	"foo.com/a.thing"
+	"foo.com/other/v2"
+	"foo.com/surprise"
+	"foo.com/v1"
+)
+`,
+	},
 }
 
 func TestDeleteImport(t *testing.T) {
@@ -1681,6 +1709,19 @@ func TestDeleteImport(t *testing.T) {
 		if got, want := deleted, false; got != want {
 			t.Errorf("second run: %s: deleted = %v, want %v", test.name, got, want)
 		}
+	}
+}
+
+func TestDeleteImportAfterAddImport(t *testing.T) {
+	file := parse(t, "test", `package main
+
+import "os"
+`)
+	if got, want := AddImport(fset, file, "fmt"), true; got != want {
+		t.Errorf("AddImport: got: %v, want: %v", got, want)
+	}
+	if got, want := DeleteImport(fset, file, "fmt"), true; got != want {
+		t.Errorf("DeleteImport: got: %v, want: %v", got, want)
 	}
 }
 
