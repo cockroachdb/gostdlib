@@ -7,8 +7,9 @@ if [[ $# -ne 0 ]]; then
   exit 1
 fi
 
-go_version=go1.13
-xtools_version=86caa796c7ab0e32b908c5ebd5748faedd06c1da
+go_version=go1.18
+xtools_version=e02e98a0378f7ab2dc934b10d293d532b9d90e9b
+xsync_version=886fb9371eb4b47af10bff9c8025a8c9e1554b92
 
 repos=/tmp/gostdlib/repos
 
@@ -20,27 +21,49 @@ fi
 if [[ ! -d "$repos/golang.org/x/tools" ]]; then
   git clone https://github.com/golang/tools.git "$repos/golang.org/x/tools"
 fi
+if [[ ! -d "$repos/golang.org/x/sync" ]]; then
+  git clone https://github.com/golang/sync.git "$repos/golang.org/x/sync"
+fi
 (cd "$repos/golang.org/x/tools" && git fetch && git checkout --force "$xtools_version")
+(cd "$repos/golang.org/x/sync" && git fetch && git checkout --force "$xsync_version")
 
 packages=(
   cmd/gofmt
+  cmd/internal/diff
   go/format
   go/printer
+  internal/execabs
+  golang.org/x/sync/errgroup
+  golang.org/x/sync/semaphore
   golang.org/x/tools/cmd/goimports
   golang.org/x/tools/go/ast/astutil
+  golang.org/x/tools/go/ast/inspector
+  golang.org/x/tools/go/buildutil
+  golang.org/x/tools/go/expect
+  golang.org/x/tools/go/gcexportdata
+  golang.org/x/tools/go/internal/cgo
+  golang.org/x/tools/go/internal/gcimporter
   golang.org/x/tools/go/internal/packagesdriver
   golang.org/x/tools/go/packages
   golang.org/x/tools/go/types/typeutil
   golang.org/x/tools/imports
+  golang.org/x/tools/internal/apidiff
+  golang.org/x/tools/internal/event
   golang.org/x/tools/internal/fastwalk
+  golang.org/x/tools/internal/gocommand
   golang.org/x/tools/internal/gopathwalk
   golang.org/x/tools/internal/imports
-  golang.org/x/tools/internal/module
-  golang.org/x/tools/internal/semver
+  golang.org/x/tools/internal/lsp/bug
+  golang.org/x/tools/internal/packagesinternal
+  golang.org/x/tools/go/internal/pkgbits
+  golang.org/x/tools/go/loader
+  golang.org/x/tools/internal/proxydir
   golang.org/x/tools/internal/span
   golang.org/x/tools/internal/testenv
   golang.org/x/tools/internal/tool
-  golang.org/x/tools/internal/txtar
+  golang.org/x/tools/internal/typeparams
+  golang.org/x/tools/internal/typesinternal
+  golang.org/x/tools/txtar
 )
 
 is_stdlib() {
@@ -84,6 +107,10 @@ while read -r f; do
   sed -E 's,// import .*,,' "$f" > "$f.tmp"
   mv "$f.tmp" "$f"
 done < <(grep -lER 'package \S+ // import' -- * | grep '\.go$')
+
+# These testdata files with bad syntax are going to upset gofmt.
+rm -rf x/tools/go/loader/testdata
+rm -rf x/tools/go/packages/packagestest/testdata
 
 go build -o bin/gofmt ./cmd/gofmt
 bin/gofmt -w .

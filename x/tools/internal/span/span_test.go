@@ -6,6 +6,7 @@ package span_test
 
 import (
 	"fmt"
+	"go/token"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,8 +15,7 @@ import (
 )
 
 var (
-	formats = []string{"%v", "%#v", "%+v"}
-	tests   = [][]string{
+	tests = [][]string{
 		{"C:/file_a", "C:/file_a", "file:///C:/file_a:1:1#0"},
 		{"C:/file_b:1:2", "C:/file_b:#1", "file:///C:/file_b:1:2#1"},
 		{"C:/file_c:1000", "C:/file_c:#9990", "file:///C:/file_c:1000:1#9990"},
@@ -30,7 +30,7 @@ var (
 func TestFormat(t *testing.T) {
 	converter := lines(10)
 	for _, test := range tests {
-		for ti, text := range test {
+		for ti, text := range test[:2] {
 			spn := span.Parse(text)
 			if ti <= 1 {
 				// we can check %v produces the same as the input
@@ -60,12 +60,15 @@ func toPath(value string) string {
 	return filepath.FromSlash(value)
 }
 
-type lines int
-
-func (l lines) ToPosition(offset int) (int, int, error) {
-	return (offset / int(l)) + 1, (offset % int(l)) + 1, nil
-}
-
-func (l lines) ToOffset(line, col int) (int, error) {
-	return (int(l) * (line - 1)) + (col - 1), nil
+// lines creates a new tokenConverter for a file with 1000 lines, each width
+// bytes wide.
+func lines(width int) *token.File {
+	fset := token.NewFileSet()
+	f := fset.AddFile("", -1, 1000*width)
+	var lines []int
+	for i := 0; i < 1000; i++ {
+		lines = append(lines, i*width)
+	}
+	f.SetLines(lines)
+	return f
 }

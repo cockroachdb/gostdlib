@@ -6,6 +6,7 @@ package gopathwalk
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -80,7 +81,7 @@ func TestShouldTraverse(t *testing.T) {
 			continue
 		}
 		var w walker
-		got := w.shouldTraverse(filepath.Join(dir, tt.dir), fi)
+		got := w.shouldTraverse(filepath.Join(dir, tt.dir, fi.Name()))
 		if got != tt.want {
 			t.Errorf("%d. shouldTraverse(%q, %q) = %v; want %v", i, tt.dir, tt.file, got, tt.want)
 		}
@@ -116,7 +117,7 @@ func TestSkip(t *testing.T) {
 			found = append(found, dir[len(root.Path)+1:])
 		}, func(root Root, dir string) bool {
 			return false
-		}, Options{ModulesEnabled: false, Debug: true})
+		}, Options{ModulesEnabled: false, Logf: log.Printf})
 	if want := []string{"shouldfind"}; !reflect.DeepEqual(found, want) {
 		t.Errorf("expected to find only %v, got %v", want, found)
 	}

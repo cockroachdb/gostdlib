@@ -7,13 +7,16 @@ package packagestest
 import (
 	"fmt"
 	"go/token"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strings"
 
+	"github.com/cockroachdb/gostdlib/x/tools/go/expect"
 	"github.com/cockroachdb/gostdlib/x/tools/go/packages"
 	"github.com/cockroachdb/gostdlib/x/tools/internal/span"
-	"golang.org/x/tools/go/expect"
 )
 
 const (
@@ -38,24 +41,27 @@ const (
 // call the Mark method to add the marker to the global set.
 // You can register the "mark" method to override these in your own call to
 // Expect. The bound Mark function is usable directly in your method map, so
-//    exported.Expect(map[string]interface{}{"mark": exported.Mark})
+//
+//	exported.Expect(map[string]interface{}{"mark": exported.Mark})
+//
 // replicates the built in behavior.
 //
-// Method invocation
+// # Method invocation
 //
 // When invoking a method the expressions in the parameter list need to be
 // converted to values to be passed to the method.
 // There are a very limited set of types the arguments are allowed to be.
-//   expect.Note : passed the Note instance being evaluated.
-//   string : can be supplied either a string literal or an identifier.
-//   int : can only be supplied an integer literal.
-//   *regexp.Regexp : can only be supplied a regular expression literal
-//   token.Pos : has a file position calculated as described below.
-//   token.Position : has a file position calculated as described below.
-//   expect.Range: has a start and end position as described below.
-//   interface{} : will be passed any value
 //
-// Position calculation
+//	expect.Note : passed the Note instance being evaluated.
+//	string : can be supplied either a string literal or an identifier.
+//	int : can only be supplied an integer literal.
+//	*regexp.Regexp : can only be supplied a regular expression literal
+//	token.Pos : has a file position calculated as described below.
+//	token.Position : has a file position calculated as described below.
+//	expect.Range: has a start and end position as described below.
+//	interface{} : will be passed any value
+//
+// # Position calculation
 //
 // There is some extra handling when a parameter is being coerced into a
 // token.Pos, token.Position or Range type argument.
@@ -148,6 +154,7 @@ func (e *Exported) getNotes() error {
 	if err != nil {
 		return fmt.Errorf("unable to load packages for directories %s: %v", dirs, err)
 	}
+	seen := make(map[token.Position]struct{})
 	for _, pkg := range pkgs {
 		for _, filename := range pkg.GoFiles {
 			content, err := e.FileContents(filename)
@@ -158,11 +165,55 @@ func (e *Exported) getNotes() error {
 			if err != nil {
 				return fmt.Errorf("failed to extract expectations: %v", err)
 			}
-			notes = append(notes, l...)
+			for _, note := range l {
+				pos := e.ExpectFileSet.Position(note.Pos)
+				if _, ok := seen[pos]; ok {
+					continue
+				}
+				notes = append(notes, note)
+				seen[pos] = struct{}{}
+			}
 		}
+	}
+	if _, ok := e.written[e.primary]; !ok {
+		e.notes = notes
+		return nil
+	}
+	// Check go.mod markers regardless of mode, we need to do this so that our marker count
+	// matches the counts in the summary.txt.golden file for the test directory.
+	if gomod, found := e.written[e.primary]["go.mod"]; found {
+		// If we are in Modules mode, then we need to check the contents of the go.mod.temp.
+		if e.Exporter == Modules {
+			gomod += ".temp"
+		}
+		l, err := goModMarkers(e, gomod)
+		if err != nil {
+			return fmt.Errorf("failed to extract expectations for go.mod: %v", err)
+		}
+		notes = append(notes, l...)
 	}
 	e.notes = notes
 	return nil
+}
+
+func goModMarkers(e *Exported, gomod string) ([]*expect.Note, error) {
+	if _, err := os.Stat(gomod); os.IsNotExist(err) {
+		// If there is no go.mod file, we want to be able to continue.
+		return nil, nil
+	}
+	content, err := e.FileContents(gomod)
+	if err != nil {
+		return nil, err
+	}
+	if e.Exporter == GOPATH {
+		return expect.Parse(e.ExpectFileSet, gomod, content)
+	}
+	gomod = strings.TrimSuffix(gomod, ".temp")
+	// If we are in Modules mode, copy the original contents file back into go.mod
+	if err := ioutil.WriteFile(gomod, content, 0644); err != nil {
+		return nil, nil
+	}
+	return expect.Parse(e.ExpectFileSet, gomod, content)
 }
 
 func (e *Exported) getMarkers() error {
@@ -358,6 +409,7 @@ func (e *Exported) buildConverter(pt reflect.Type) (converter, error) {
 }
 
 func (e *Exported) rangeConverter(n *expect.Note, args []interface{}) (span.Range, []interface{}, error) {
+	tokFile := e.ExpectFileSet.File(n.Pos)
 	if len(args) < 1 {
 		return span.Range{}, nil, fmt.Errorf("missing argument")
 	}
@@ -368,10 +420,9 @@ func (e *Exported) rangeConverter(n *expect.Note, args []interface{}) (span.Rang
 		// handle the special identifiers
 		switch arg {
 		case eofIdentifier:
-			// end of file identifier, look up the current file
-			f := e.ExpectFileSet.File(n.Pos)
-			eof := f.Pos(f.Size())
-			return span.Range{FileSet: e.ExpectFileSet, Start: eof, End: token.NoPos}, args, nil
+			// end of file identifier
+			eof := tokFile.Pos(tokFile.Size())
+			return span.NewRange(tokFile, eof, eof), args, nil
 		default:
 			// look up an marker by name
 			mark, ok := e.markers[string(arg)]
@@ -385,19 +436,19 @@ func (e *Exported) rangeConverter(n *expect.Note, args []interface{}) (span.Rang
 		if err != nil {
 			return span.Range{}, nil, err
 		}
-		if start == token.NoPos {
+		if !start.IsValid() {
 			return span.Range{}, nil, fmt.Errorf("%v: pattern %s did not match", e.ExpectFileSet.Position(n.Pos), arg)
 		}
-		return span.Range{FileSet: e.ExpectFileSet, Start: start, End: end}, args, nil
+		return span.NewRange(tokFile, start, end), args, nil
 	case *regexp.Regexp:
 		start, end, err := expect.MatchBefore(e.ExpectFileSet, e.FileContents, n.Pos, arg)
 		if err != nil {
 			return span.Range{}, nil, err
 		}
-		if start == token.NoPos {
+		if !start.IsValid() {
 			return span.Range{}, nil, fmt.Errorf("%v: pattern %s did not match", e.ExpectFileSet.Position(n.Pos), arg)
 		}
-		return span.Range{FileSet: e.ExpectFileSet, Start: start, End: end}, args, nil
+		return span.NewRange(tokFile, start, end), args, nil
 	default:
 		return span.Range{}, nil, fmt.Errorf("cannot convert %v to pos", arg)
 	}
