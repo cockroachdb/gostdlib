@@ -19,11 +19,6 @@ import (
 	"sync"
 )
 
-// PanicOnBugs controls whether to panic when bugs are reported.
-//
-// It may be set to true during testing.
-var PanicOnBugs = false
-
 var (
 	mu        sync.Mutex
 	exemplars map[string]Bug
@@ -44,19 +39,6 @@ type Bug struct {
 // Data is additional metadata to record for a bug.
 type Data map[string]interface{}
 
-// Reportf reports a formatted bug message.
-func Reportf(format string, args ...interface{}) {
-	Report(fmt.Sprintf(format, args...), nil)
-}
-
-// Errorf calls fmt.Errorf for the given arguments, and reports the resulting
-// error message as a bug.
-func Errorf(format string, args ...interface{}) error {
-	err := fmt.Errorf(format, args...)
-	Report(err.Error(), nil)
-	return err
-}
-
 // Report records a new bug encountered on the server.
 // It uses reflection to report the position of the immediate caller.
 func Report(description string, data Data) {
@@ -65,10 +47,6 @@ func Report(description string, data Data) {
 	key := "<missing callsite>"
 	if ok {
 		key = fmt.Sprintf("%s:%d", file, line)
-	}
-
-	if PanicOnBugs {
-		panic(fmt.Sprintf("%s: %s", key, description))
 	}
 
 	bug := Bug{

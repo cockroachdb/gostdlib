@@ -48,13 +48,14 @@ func TestToken(t *testing.T) {
 	}
 	for _, test := range tokenTests {
 		f := files[test.URI()]
+		c := span.NewTokenConverter(fset, f)
 		t.Run(path.Base(f.Name()), func(t *testing.T) {
-			checkToken(t, f, span.New(
+			checkToken(t, c, span.New(
 				test.URI(),
 				span.NewPoint(test.Start().Line(), test.Start().Column(), 0),
 				span.NewPoint(test.End().Line(), test.End().Column(), 0),
 			), test)
-			checkToken(t, f, span.New(
+			checkToken(t, c, span.New(
 				test.URI(),
 				span.NewPoint(0, 0, test.Start().Offset()),
 				span.NewPoint(0, 0, test.End().Offset()),
@@ -63,8 +64,8 @@ func TestToken(t *testing.T) {
 	}
 }
 
-func checkToken(t *testing.T, f *token.File, in, expect span.Span) {
-	rng, err := in.Range(f)
+func checkToken(t *testing.T, c *span.TokenConverter, in, expect span.Span) {
+	rng, err := in.Range(c)
 	if err != nil {
 		t.Error(err)
 	}

@@ -7,9 +7,9 @@ if [[ $# -ne 0 ]]; then
   exit 1
 fi
 
-go_version=go1.18
-xtools_version=e02e98a0378f7ab2dc934b10d293d532b9d90e9b
-xsync_version=886fb9371eb4b47af10bff9c8025a8c9e1554b92
+go_version=go1.19
+xtools_version=1e55371df567127a49b447aa65b92cb04ad99138
+xsync_version=0976fa681c295de5355f7a4d968b56cb9da8a76b
 
 repos=/tmp/gostdlib/repos
 
@@ -29,10 +29,9 @@ fi
 
 packages=(
   cmd/gofmt
-  cmd/internal/diff
   go/format
   go/printer
-  internal/execabs
+  internal/diff
   golang.org/x/sync/errgroup
   golang.org/x/sync/semaphore
   golang.org/x/tools/cmd/goimports
@@ -55,7 +54,6 @@ packages=(
   golang.org/x/tools/internal/imports
   golang.org/x/tools/internal/lsp/bug
   golang.org/x/tools/internal/packagesinternal
-  golang.org/x/tools/go/internal/pkgbits
   golang.org/x/tools/go/loader
   golang.org/x/tools/internal/proxydir
   golang.org/x/tools/internal/span
