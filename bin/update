@@ -7,7 +7,7 @@ if [[ $# -ne 0 ]]; then
   exit 1
 fi
 
-go_version=go1.19
+go_version=go1.21.12
 xtools_version=1e55371df567127a49b447aa65b92cb04ad99138
 xsync_version=0976fa681c295de5355f7a4d968b56cb9da8a76b
 
